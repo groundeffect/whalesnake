@@ -746,8 +746,7 @@ class Image(object):
         '''
         Removes the image.
         
-        force: Needed for removal, if the image is tagged in multiple
-            repositories
+        force: Needed for removal, if the image has multiple tags
         no_prune: Do not delete untagged parents
         
         Returns: Nothing
