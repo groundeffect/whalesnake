@@ -630,7 +630,7 @@ class Image(object):
         rm: Remove intermediate containers. Defaults to True on the command
             line, but not in docker-py
             
-        Returns: The build log as a string
+        Returns: Nothing
         
         Possible docker-py arguments and their defaults:
         quiet=False, nocache=False, timeout=None
