@@ -1,7 +1,7 @@
 whalesnake
 ==========
 
-whalesnake aims to be an intuitive, object-oriented client to access the docker daemon from Python. The heavy lifting is done by docker-py, which is also the only dependency.
+whalesnake aims to be an intuitive high-level, object-oriented client to access the docker daemon from Python. The heavy lifting is done by docker-py, which is also the only dependency.
 
 So far tested with Python 2.7, docker API 1.13/1.14 and docker-py 0.4.0.
 
@@ -31,7 +31,7 @@ if ctns:
 else:
     # sets up, but does not yet create a container with the name 'redis_ctn'
     ctn = ws.Container('redis_ctn')
-    # pull the official redis image from the docker hub and fire the container up
+    # pull the official redis image from the docker hub, create and fire up the container
     ctn.run('redis:latest')
     # see what's going on inside the container
     ctn.top()
@@ -43,3 +43,5 @@ ctn.remove()
 redis_img.remove()
 
 ```
+
+See also the `examples` folder.
