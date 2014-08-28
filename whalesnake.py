@@ -11,6 +11,12 @@ except ImportError:
 
 import docker
 
+# try to avoid using six for now
+try:
+  basestring
+except NameError:
+  basestring = str
+
 # missing in docker-py:
 # 'load', 'pause', 'save', 'unpause'
 # (un)pause seems rather easy to implement. see:
@@ -438,7 +444,7 @@ class Container(object):
         if not self.exists:
             raise WhalesnakeError('Container was not yet created.')
         tar = dc.export(self.long_id) # returns a 'tar' stream
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             while True:
                 l = tar.read(52428800) # 50MB
                 if not l:
@@ -523,10 +529,10 @@ class Container(object):
         dc.start(self.long_id, *args, **kwargs)
         self._check_status()
     
-    def stop(self, timeout=None):
+    def stop(self, **kwargs):
         if not self.running:
             raise WhalesnakeError('Container is not running.')
-        dc.stop(self.long_id, timeout)
+        dc.stop(self.long_id, **kwargs)
         self._check_status()
     
     def top(self):
@@ -699,11 +705,11 @@ class Image(object):
             return
         
         elif status == '' and len(lines) is 1:
-            msg = lines[0]
-            if 'errorDetail' in msg:
-                msg = json.loads(msg.split('\r\n')[-2])
+            err = lines[0]
+            if 'errorDetail' in err:
+                msg = json.loads(err)['errorDetail']['message']
                 raise WhalesnakeError(
-                    'Build failed: {0}'.format(msg['errorDetail']['message'])
+                    'Build failed: {0}'.format(msg)
                 )
         
         # something else went wrong - dump everything we got back

@@ -3,7 +3,7 @@ whalesnake
 
 whalesnake aims to be an intuitive high-level, object-oriented client to access the docker daemon from Python. The heavy lifting is done by docker-py, which is also the only dependency.
 
-So far tested with Python 2.7, docker API 1.13/1.14 and docker-py 0.4.0.
+So far tested with Python 2.7 & 3.4, docker API 1.13 & 1.14 and docker-py 0.4.0.
 
 Usage
 =====
@@ -45,3 +45,4 @@ redis_img.remove()
 ```
 
 See also the `examples` folder.
+

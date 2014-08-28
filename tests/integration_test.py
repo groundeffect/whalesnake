@@ -13,6 +13,12 @@ from pytest import raises
 
 import whalesnake as ws
 
+# try to avoid using six for now
+try:
+  basestring
+except NameError:
+  basestring = str
+
 ws.connect()
 c = docker.Client(base_url='unix://var/run/docker.sock',
                   version='1.13',
@@ -362,7 +368,7 @@ class Test_Container:
         with raises(ValueError) as e:
             # valid short id, but not existent
             ctn = ws.Container('abcdef123456')
-        assert e.value.message.startswith('No container was found')
+        assert e.value.args[0].startswith('No container was found')
         with raises(ValueError):
             # invalid character: /
             ctn = ws.Container('abcdef/')
@@ -427,10 +433,10 @@ class Test_Container:
         with raises(ValueError) as e:
             i = ws.Image('non_existing_image')
             ctn.create(i)
-        assert e.value.message.startswith('No such image could be found')
+        assert e.value.args[0].startswith('No such image could be found')
         with raises(ValueError) as e:
             ctn.create('non_existing_image_name')
-        assert e.value.message.startswith('No such image could be found')
+        assert e.value.args[0].startswith('No such image could be found')
         with raises(ValueError):
             ctn.create('arko/sinatra') # unlikely to exist, only few DL's
     
@@ -460,7 +466,8 @@ class Test_Container:
     
     def test_logs(self):
         ctn = ws.Container(TEST_CONTAINER_ID)
-        assert isinstance(ctn.logs(), basestring)
+        #assert isinstance(ctn.logs(), basestring)
+        assert ctn.logs() == b''
     
     def test_port(self):
         port_bindings = {
@@ -469,7 +476,8 @@ class Test_Container:
         }
         
         ctn = ws.Container('whalesnake_test_ctn5')
-        ctn.create(TEST_IMAGE_ID, 'sleep 999', ports=port_bindings.keys())
+        # json needs the wrap in list() to parse correctly
+        ctn.create(TEST_IMAGE_ID, 'sleep 999', ports=list(port_bindings.keys()))
         ctn.start(port_bindings=port_bindings)
         p = ctn.port(1111)
         assert isinstance(p, list)
@@ -493,7 +501,7 @@ class Test_Container:
         with raises(ws.WhalesnakeError):
             ctn.restart()
         assert ctn.running is True
-        ctn.stop()
+        ctn.stop(timeout=0)
         assert ctn.running is False
         ctn.restart()
         assert ctn.running is True
@@ -506,7 +514,7 @@ class Test_Container:
             ctn.start()
         ctn = ws.Container('non_existing_container')
         with raises(ws.WhalesnakeError):
-            ctn.stop()
+            ctn.stop(timeout=0)
         ctn = ws.Container('non_existing_container')
         with raises(ws.WhalesnakeError):
             ctn.restart()
@@ -545,7 +553,7 @@ class Test_Container:
         t = ctn.top()
         assert len(t['Processes']) is 1
         assert t['Processes'][0][-1] == cmd
-        ctn.stop()
+        ctn.stop(timeout=0)
         
         ctn = ws.Container('non_existing_container')
         with raises(ws.WhalesnakeError):
@@ -559,21 +567,21 @@ class Test_Container:
         ctn.run(TEST_IMAGE_ID, 'sleep 999')
         assert ctn.exists is True
         assert ctn.running is True
-        ctn.stop()
+        ctn.stop(timeout=0)
         
         # try running with an existing image that can be pulled
         ctn = ws.Container('whalesnake_test_ctn96')
         ctn.run('greglearns/dietfs', 'sleep 999')
         assert ctn.exists is True
         assert ctn.running is True
-        ctn.stop()
+        ctn.stop(timeout=0)
         
         # try running with a non-existing image that also can NOT be pulled
         img = 'non_existent_image'
         ctn = ws.Container('whalesnake_test_ctn97')
         with raises(ws.WhalesnakeError) as e:
             ctn.run(img, 'sleep 999')
-        assert e.value.message.find('Unable to get image') is not -1
+        assert e.value.args[0].find('Unable to get image') is not -1
         assert ctn.exists is False
         assert ctn.running is False
 
@@ -582,13 +590,13 @@ class Test_Container:
 class Test_Image:
 
     def get_dockerfile(self, image):
-        # strings need to be fed to io.StringIO and be unicode!
-        df = u'FROM {0}\n' + \
-             u'MAINTAINER whalesnake\n' + \
-             u'RUN echo "test" > /tmp/test\n'
+        # strings need to be fed to io.BytesIO and be unicode!
+        df = 'FROM {0}\n' + \
+             'MAINTAINER whalesnake\n' + \
+             'RUN echo "test" > /tmp/test\n'
              
         df = df.format(image)
-        return len(df), io.StringIO(df)
+        return len(df), io.BytesIO(df.encode('UTF-8'))
     
     def test_instantiation(self):
         img = ws.Image('whalesnake_test_img1')
@@ -625,7 +633,7 @@ class Test_Image:
         with raises(ValueError) as e:
             # valid short id, but not existent
             img = ws.Image('abcdef123456')
-        assert e.value.message.startswith('No image was found')
+        assert e.value.args[0].startswith('No image was found')
         with raises(ValueError):
             # invalid character: /
             img = ws.Image('abcdef/')
@@ -672,6 +680,7 @@ class Test_Image:
         assert img.exists is False
     
     def test_remove(self):
+        # relies on test_pull to have successfully pulled the image
         img = ws.Image('jpetazzo/busybox:latest')
         img.remove()
         assert img.exists is False
@@ -701,7 +710,7 @@ class Test_Image:
         img = ws.Image('whalesnake_test_img2')
         with raises(ws.WhalesnakeError) as e:
             img.build(f_obj, 'file')
-        assert e.value.message.find('Invalid repository name (***)') is not -1
+        assert e.value.args[0].find('Invalid repository name (***)') is not -1
         assert img.exists is False
         
         # build from file object. use unknown, locally available test image
@@ -720,9 +729,9 @@ class Test_Image:
         
         # build from .tar file
         f_size, f_obj = self.get_dockerfile(TEST_IMAGE_NAME)
-        context = io.StringIO()
+        context = io.BytesIO()
         tar = tarfile.open(mode='w|', fileobj=context)
-        info = tarfile.TarInfo(name=u"Dockerfile")
+        info = tarfile.TarInfo(name='Dockerfile')
         info.size = f_size
         tar.addfile(tarinfo=info, fileobj=f_obj)
         tar.close()
@@ -736,9 +745,9 @@ class Test_Image:
         
         # build from .tar.gz file
         f_size, f_obj = self.get_dockerfile(TEST_IMAGE_NAME)
-        context = io.BytesIO() # gzip outputs a byte stream
+        context = io.BytesIO()
         tar = tarfile.open(mode='w|gz', fileobj=context)
-        info = tarfile.TarInfo(name=u"Dockerfile")
+        info = tarfile.TarInfo(name='Dockerfile')
         info.size = f_size
         tar.addfile(tarinfo=info, fileobj=f_obj)
         tar.close()
@@ -755,7 +764,7 @@ class Test_Image:
         td = tempfile.gettempdir() + '/whalesnake_test'
         tf = td + '/Dockerfile'
         os.mkdir(td)
-        with open(tf, 'w') as f:
+        with open(tf, 'wb') as f:
             f.write(f_obj.read())
         img = ws.Image('whalesnake_test_img6')
         img.build(td, 'path')
@@ -771,7 +780,7 @@ class Test_Image:
         with raises(ValueError) as e:
             img.build('some_tag', 'unknown')
         assert img.exists is False
-        assert e.value.message == 'Build type "unknown" is not supported.'
+        assert e.value.args[0] == 'Build type "unknown" is not supported.'
     
     def test_history(self):
         img = ws.Image(TEST_IMAGE_NAME)
