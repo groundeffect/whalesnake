@@ -36,7 +36,7 @@ else:
     # see what's going on inside the container
     ctn.top()
 
-# clean everythin up
+# clean everything up
 redis_img = ctn.image
 ctn.stop()
 ctn.remove()
